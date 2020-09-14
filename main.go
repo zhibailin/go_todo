@@ -2,11 +2,13 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"net/http"
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
-	"net/http"
-	"strconv"
 )
 
 var db *gorm.DB
@@ -15,9 +17,9 @@ func init() {
 	// open a db connection
 	var err error
 	db, err = gorm.Open("mysql",
-		fmt.Sprintf("%s:%s@todo?charset=utf8&parseTime=True&loc=Local", username, password))
+		fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8&parseTime=True&loc=Local", username, password, host, dbname))
 	if err != nil {
-		panic("failed to connect database")
+		log.Fatal(err)
 	}
 
 	// Migrate the schema
@@ -37,13 +39,14 @@ func main() {
 	}
 	router.Run()
 }
+
 func createTodo(c *gin.Context) {
 	completed, _ := strconv.Atoi(c.PostForm("completed"))
 	todo := todoModel{Title: c.PostForm("title"), Completed: completed}
 	db.Save(&todo)
 	c.JSON(http.StatusCreated, gin.H{
-		"status": http.StatusCreated,
-		"message": "Todo item created successfully!",
+		"status":     http.StatusCreated,
+		"message":    "Todo item created successfully!",
 		"resourceID": todo.ID,
 	})
 }
@@ -55,7 +58,7 @@ func deleteTodo(c *gin.Context) {
 	db.First(&todo, todoID)
 	if todo.ID == 0 {
 		c.JSON(http.StatusNotFound, gin.H{
-			"status": http.StatusNotFound,
+			"status":  http.StatusNotFound,
 			"message": "No todo found!",
 		})
 		return
@@ -72,7 +75,7 @@ func fetchSingleTodo(c *gin.Context) {
 	db.First(&todo, todoID)
 	if todo.ID == 0 {
 		c.JSON(http.StatusNotFound, gin.H{
-			"status": http.StatusNotFound,
+			"status":  http.StatusNotFound,
 			"message": "No todo found!",
 		})
 		return
@@ -80,7 +83,7 @@ func fetchSingleTodo(c *gin.Context) {
 
 	// 生成响应的数据并响应
 	completed := false
-	if todo.Completed == 1{
+	if todo.Completed == 1 {
 		completed = true
 	} else {
 		completed = false
@@ -88,7 +91,7 @@ func fetchSingleTodo(c *gin.Context) {
 	_todo := transformedTodo{ID: todo.ID, Title: todo.Title, Completed: completed}
 	c.JSON(http.StatusOK, gin.H{
 		"status": http.StatusOK,
-		"data": _todo,
+		"data":   _todo,
 	})
 }
 
@@ -99,7 +102,7 @@ func fetchAllTodo(c *gin.Context) {
 	db.Find(&todos)
 	if len(todos) <= 0 {
 		c.JSON(http.StatusNotFound, gin.H{
-			"status": http.StatusNotFound,
+			"status":  http.StatusNotFound,
 			"message": "No todo found !",
 		})
 		return
@@ -115,13 +118,12 @@ func fetchAllTodo(c *gin.Context) {
 		}
 		// transforms the todos for building a good response
 		_todos = append(_todos, transformedTodo{ID: item.ID, Title: item.Title, Completed: completed})
-		c.JSON(http.StatusOK, gin.H{
-			"status": http.StatusOK,
-			"data":_todos,
-		})
 	}
+	c.JSON(http.StatusOK, gin.H{
+		"status": http.StatusOK,
+		"data":   _todos,
+	})
 }
-
 
 func updateTodo(c *gin.Context) {
 	// 先根据 id 找到 record
@@ -131,7 +133,7 @@ func updateTodo(c *gin.Context) {
 
 	if todo.ID == 0 {
 		c.JSON(http.StatusNotFound, gin.H{
-			"status": http.StatusNotFound,,
+			"status":  http.StatusNotFound,
 			"message": "No todo found!",
 		})
 		return
@@ -144,7 +146,7 @@ func updateTodo(c *gin.Context) {
 	db.Model(&todo).Update("completed", completed)
 
 	c.JSON(http.StatusOK, gin.H{
-		"status": http.StatusOK,
+		"status":  http.StatusOK,
 		"message": "Todo updated successfully!",
 	})
 }
